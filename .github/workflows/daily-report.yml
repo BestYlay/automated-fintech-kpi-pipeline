@@ -1,0 +1,41 @@
+name: Daily FinTech Report
+
+on:
+  schedule:
+    - cron: "30 17 * * *"
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "Business date in Asia/Hong_Kong (YYYY-MM-DD)"
+        required: false
+        type: string
+
+jobs:
+  daily-report:
+    runs-on: ubuntu-latest
+    env:
+      PIPELINE_DATABASE_URL: ${{ secrets.PIPELINE_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "."
+      - name: Run scheduled batch
+        shell: bash
+        env:
+          MANUAL_DATE: ${{ inputs.report_date }}
+        run: |
+          if [ -n "$MANUAL_DATE" ]; then
+            REPORT_DATE="$MANUAL_DATE"
+          else
+            REPORT_DATE=$(TZ=Asia/Hong_Kong date -d 'yesterday' +%F)
+          fi
+          python -m fintech_pipeline run --date "$REPORT_DATE"
+          python -m fintech_pipeline export --date "$REPORT_DATE"
+      - name: Upload KPI exports
+        uses: actions/upload-artifact@v4
+        with:
+          name: fintech-kpi-${{ github.run_id }}
+          path: exports/*.csv
+

@@ -1,0 +1,33 @@
+{
+  "as_of": "2026-08-19",
+  "currency": "HKD",
+  "income_reference": {
+    "median_monthly_employment_earnings_hkd": 21000,
+    "source": "C&SD Quarterly Report on the General Household Survey, 2026 Q1",
+    "source_url": "https://www.censtat.gov.hk/wbr/B1050001/B10500012026QQ01/att/en/B10500012026QQ01.pdf"
+  },
+  "simulation_assumptions": {
+    "daily_new_customer_mean": 120,
+    "application_probability_new_customer": 0.28,
+    "application_probability_existing_customer": 0.0006,
+    "approved_to_funded_probability": 0.90,
+    "loan_principal_hkd": [5000, 150000],
+    "term_months": [6, 12, 24, 36],
+    "annual_rate": [0.06, 0.30],
+    "late_payment_max_delay_days": 30,
+    "correction_probability": 0.005,
+    "invalid_input_probability": 0.001,
+    "duplicate_input_probability": 0.002
+  },
+  "risk_grade_defaults": {
+    "A": {"approval_floor": 0.78, "on_time": 0.97},
+    "B": {"approval_floor": 0.66, "on_time": 0.94},
+    "C": {"approval_floor": 0.52, "on_time": 0.88},
+    "D": {"approval_floor": 0.36, "on_time": 0.78},
+    "E": {"approval_floor": 0.20, "on_time": 0.62}
+  },
+  "notes": [
+    "Synthetic parameters are business assumptions, not lending-policy recommendations.",
+    "HKMA credit-card delinquency is an external reasonableness reference only."
+  ]
+}

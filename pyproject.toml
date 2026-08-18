@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "automated-fintech-kpi-pipeline"
+version = "0.1.0"
+description = "Synthetic Hong Kong lending KPI pipeline with PostgreSQL marts"
+requires-python = ">=3.12"
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "plotly>=5.24",
+  "psycopg[binary]>=3.2",
+  "streamlit>=1.40",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
