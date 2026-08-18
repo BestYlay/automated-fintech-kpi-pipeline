@@ -128,6 +128,7 @@ elif page == "Campaigns":
     if campaign.empty:
         st.info("No campaign data")
     else:
+        campaign = campaign[campaign.report_date == latest_date]
         summary = campaign.groupby(["campaign_id", "channel"], as_index=False).agg(
             touches=("touches", "sum"), opens=("opens", "sum"), clicks=("clicks", "sum"),
             applications=("applications", "sum"), funded_amount=("funded_amount", "sum")
@@ -147,4 +148,3 @@ else:
     else:
         st.dataframe(dq.head(100), use_container_width=True, hide_index=True)
         st.metric("Latest failed checks", int(((dq.report_date == latest_date) & (dq.status == "failed")).sum()))
-
