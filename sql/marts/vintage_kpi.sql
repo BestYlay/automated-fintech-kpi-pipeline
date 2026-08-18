@@ -32,9 +32,11 @@ SELECT
     months_on_book,
     COUNT(DISTINCT active_loan),
     SUM(GREATEST(scheduled_principal - principal_paid, 0)),
-    SUM(GREATEST(scheduled_principal - principal_paid, 0)) FILTER (WHERE dpd >= 30 AND amount_paid < amount_due),
-    SUM(GREATEST(scheduled_principal - principal_paid, 0)) FILTER (WHERE dpd >= 30 AND amount_paid < amount_due)
-      / NULLIF(SUM(GREATEST(scheduled_principal - principal_paid, 0)), 0)
+    COALESCE(SUM(GREATEST(scheduled_principal - principal_paid, 0)) FILTER (WHERE dpd >= 30 AND amount_paid < amount_due), 0),
+    COALESCE(
+      SUM(GREATEST(scheduled_principal - principal_paid, 0)) FILTER (WHERE dpd >= 30 AND amount_paid < amount_due)
+      / NULLIF(SUM(GREATEST(scheduled_principal - principal_paid, 0)), 0),
+      0
+    )
 FROM states
 GROUP BY origination_month, months_on_book;
-
