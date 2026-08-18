@@ -263,6 +263,21 @@ def run_day(report_date: date, lookback_days: int = 45) -> dict:
         with connection() as conn:
             with conn.transaction():
                 conn.execute("SELECT pg_advisory_xact_lock(%s)", (LOCK_KEY,))
+                previous = fetch_rows(
+                    conn,
+                    "SELECT status, rows_loaded, rows_rejected FROM audit.pipeline_runs WHERE run_date = %s",
+                    (report_date,),
+                )
+                if previous and previous[0]["status"] == "success":
+                    _refresh_marts(conn, report_date, lookback_days)
+                    return {
+                        "status": "success",
+                        "report_date": report_date.isoformat(),
+                        "loaded": previous[0]["rows_loaded"],
+                        "rejected": previous[0]["rows_rejected"],
+                        "idempotent_replay": True,
+                        "elapsed_seconds": round(time.perf_counter() - started, 3),
+                    }
                 conn.execute(
                     """
                     INSERT INTO audit.pipeline_runs(run_date, status, batch_id, started_at)
