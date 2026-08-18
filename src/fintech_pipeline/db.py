@@ -84,4 +84,3 @@ def export_query(conn: psycopg.Connection, query: str, path: Path, params: tuple
                 writer.writerow(row)
                 count += 1
     return count
-
