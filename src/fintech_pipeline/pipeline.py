@@ -24,7 +24,8 @@ class PipelineFailure(RuntimeError):
 
 def init_db() -> None:
     with connection() as conn:
-        execute_sql_file(conn, MIGRATION)
+        for migration in sorted((ROOT / "sql").glob("*.sql")):
+            execute_sql_file(conn, migration)
         conn.commit()
 
 
