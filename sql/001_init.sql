@@ -211,6 +211,7 @@ CREATE TABLE IF NOT EXISTS mart.daily_portfolio_kpi (
 
 CREATE TABLE IF NOT EXISTS mart.daily_campaign_kpi (
     report_date DATE NOT NULL,
+    touch_date DATE NOT NULL,
     campaign_id TEXT NOT NULL,
     channel TEXT NOT NULL,
     touches INTEGER NOT NULL,
@@ -219,7 +220,7 @@ CREATE TABLE IF NOT EXISTS mart.daily_campaign_kpi (
     applications INTEGER NOT NULL,
     funded_count INTEGER NOT NULL,
     funded_amount NUMERIC(16,2) NOT NULL,
-    PRIMARY KEY (report_date, campaign_id, channel)
+    PRIMARY KEY (report_date, touch_date, campaign_id, channel)
 );
 
 CREATE TABLE IF NOT EXISTS mart.vintage_kpi (
@@ -246,4 +247,3 @@ CREATE TABLE IF NOT EXISTS mart.dq_summary (
 CREATE INDEX IF NOT EXISTS idx_credit_date ON mart.daily_credit_kpi(report_date);
 CREATE INDEX IF NOT EXISTS idx_portfolio_date ON mart.daily_portfolio_kpi(report_date);
 CREATE INDEX IF NOT EXISTS idx_vintage_date ON mart.vintage_kpi(report_date);
-
