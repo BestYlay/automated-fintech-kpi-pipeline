@@ -31,7 +31,6 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: python -m fintech_pipeline init-db
       - run: pytest -q
-      - run: python -m fintech_pipeline bootstrap --start 2026-01-01 --end 2026-01-07
+      - run: python -m fintech_pipeline bootstrap --start 2026-01-01 --end 2026-01-07 --workers 2
       - run: python -m fintech_pipeline run --date 2026-01-08
       - run: python -m fintech_pipeline run --date 2026-01-08
-

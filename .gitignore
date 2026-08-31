@@ -9,8 +9,11 @@ pytest-cache-files-*/
 !.env.example
 logs/*.txt
 exports/*.csv
-powerbi/*.pbix
-powerbi/*.pdf
-powerbi/screenshots/
+# The reviewed PBIX/PDF/screenshots are release artifacts and are intentionally
+# committed.  Do not commit credentials or local Power BI cache files.
+powerbi/~$*.pbix
+powerbi/.local/
 data/generated/
 *.egg-info/
+config/*.dpapi
+config/local_python_path.txt

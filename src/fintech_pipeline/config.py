@@ -22,7 +22,13 @@ class Settings:
             raise RuntimeError("PIPELINE_DATABASE_URL is required")
         return cls(url, os.environ.get("PIPELINE_TIMEZONE", "Asia/Hong_Kong"))
 
+    @staticmethod
+    def publish_database_url() -> str:
+        url = os.environ.get("MART_PUBLISH_DATABASE_URL")
+        if not url:
+            raise RuntimeError("MART_PUBLISH_DATABASE_URL is required for mart publication")
+        return url
+
 
 def load_calibration() -> dict:
     return json.loads(CALIBRATION_PATH.read_text(encoding="utf-8"))
-

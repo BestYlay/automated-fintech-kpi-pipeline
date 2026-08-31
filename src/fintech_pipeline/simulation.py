@@ -270,5 +270,8 @@ def simulate_day(report_date: date, state: dict[str, Any]) -> Batch:
         bad["source_event_id"] = f"invalid:{report_date.isoformat()}:application"
         bad["requested_amount"] = -1.0
         batch.rejected.append({"source_event_id": bad["source_event_id"], "reason": "negative requested amount", "payload": bad})
-        batch.applications.pop()
+        # Keep the invalid source record quarantined instead of removing the
+        # last valid application from the batch.  Loans are created before the
+        # deliberate bad record is injected; popping a valid application here
+        # can therefore leave an otherwise valid loan orphaned.
     return batch
