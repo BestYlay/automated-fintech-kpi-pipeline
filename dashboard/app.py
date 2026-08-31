@@ -13,6 +13,15 @@ st.title("Hong Kong FinTech KPI Reporting")
 st.caption("Synthetic unsecured-loan portfolio • PostgreSQL marts • report dates in Asia/Hong_Kong")
 
 
+def coerce_numeric(frame: pd.DataFrame, columns: tuple[str, ...]) -> pd.DataFrame:
+    """Convert PostgreSQL NUMERIC values (returned as Decimal) for Plotly."""
+    result = frame.copy()
+    for column in columns:
+        if column in result:
+            result[column] = pd.to_numeric(result[column], errors="coerce")
+    return result
+
+
 @st.cache_resource
 def get_connection():
     url = os.environ.get("READ_ONLY_DATABASE_URL")
@@ -43,6 +52,18 @@ except Exception as exc:
     st.error(f"Dashboard data is unavailable: {exc}")
     st.info("Configure READ_ONLY_DATABASE_URL and run the pipeline once.")
     st.stop()
+
+credit = coerce_numeric(
+    credit,
+    ("unique_applicants", "applications", "approvals", "accepted", "funded_count", "requested_amount", "funded_amount", "approval_rate", "acceptance_rate"),
+)
+portfolio = coerce_numeric(
+    portfolio,
+    ("active_loans", "outstanding_principal", "amount_due", "amount_paid", "collection_rate", "dpd_1_balance", "dpd_7_balance", "dpd_30_balance", "dpd_90_balance"),
+)
+campaign = coerce_numeric(campaign, ("touches", "opens", "clicks", "applications", "funded_count", "funded_amount"))
+vintage = coerce_numeric(vintage, ("months_on_book", "active_loans", "outstanding_principal", "dpd_30_balance", "dpd_30_rate"))
+dq = coerce_numeric(dq, ("observed_value",))
 
 
 if credit.empty and portfolio.empty:
