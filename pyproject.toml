@@ -2,6 +2,11 @@
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+# Streamlit Community Cloud uses Poetry when it detects pyproject.toml.
+# This repository is an application, not a Poetry distribution package.
+[tool.poetry]
+package-mode = false
+
 [project]
 name = "automated-fintech-kpi-pipeline"
 version = "0.1.0"
@@ -24,4 +29,3 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-
