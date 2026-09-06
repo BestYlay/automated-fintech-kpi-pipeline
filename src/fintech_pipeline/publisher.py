@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from datetime import date
 from typing import Any
 
@@ -83,6 +84,7 @@ def _validate_range(start: date, end: date) -> None:
 def _rows_from_local(start: date, end: date) -> dict[str, list[tuple[Any, ...]]]:
     snapshots: dict[str, list[tuple[Any, ...]]] = {}
     with connection() as conn:
+        conn.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
         for table, columns in MART_COLUMNS.items():
             column_sql = ", ".join(columns)
             rows = fetch_rows(
@@ -98,8 +100,8 @@ def _rows_from_local(start: date, end: date) -> dict[str, list[tuple[Any, ...]]]
 
 def _checksum(rows: list[tuple[Any, ...]]) -> str:
     digest = hashlib.sha256()
-    for row in rows:
-        digest.update(json.dumps(row, default=str, separators=(",", ":")).encode("utf-8"))
+    for row in sorted(json.dumps(row, default=str, separators=(",", ":")) for row in rows):
+        digest.update(row.encode("utf-8"))
         digest.update(b"\n")
     return digest.hexdigest()
 
@@ -128,6 +130,17 @@ def _check_target_schema(conn: psycopg.Connection) -> None:
         )
 
 
+def _connect_target(url: str) -> psycopg.Connection:
+    for attempt in range(3):
+        try:
+            return psycopg.connect(url, connect_timeout=20)
+        except psycopg.OperationalError:
+            if attempt == 2:
+                raise
+            time.sleep(5)
+    raise AssertionError("unreachable")
+
+
 def publish_marts(start: date, end: date) -> dict[str, Any]:
     """Atomically replace an aggregate mart date range on the remote target."""
     _validate_range(start, end)
@@ -136,7 +149,7 @@ def publish_marts(start: date, end: date) -> dict[str, Any]:
     counts = {table: len(rows) for table, rows in snapshots.items()}
     checksums = {table: _checksum(rows) for table, rows in snapshots.items()}
 
-    with psycopg.connect(target_url) as remote:
+    with _connect_target(target_url) as remote:
         with remote.transaction():
             remote.execute("SELECT pg_advisory_xact_lock(%s)", (PUBLISH_LOCK_KEY,))
             _check_target_schema(remote)
@@ -156,12 +169,21 @@ def publish_marts(start: date, end: date) -> dict[str, Any]:
                     )
                     with remote.cursor() as cur:
                         cur.executemany(insert_query, rows)
+                persisted = remote.execute(
+                    sql.SQL("SELECT {} FROM {} WHERE report_date BETWEEN %s AND %s").format(
+                        sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+                        sql.Identifier("mart", table),
+                    ), (start, end),
+                ).fetchall()
+                if len(persisted) != counts[table] or _checksum(persisted) != checksums[table]:
+                    raise RuntimeError(f"Remote reconciliation failed: {table}")
 
     return {
         "start": start.isoformat(),
         "end": end.isoformat(),
         "counts": counts,
         "checksums": checksums,
+        "remote_verified": True,
     }
 
 

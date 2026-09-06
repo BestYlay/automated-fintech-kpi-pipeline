@@ -22,7 +22,6 @@ def coerce_numeric(frame: pd.DataFrame, columns: tuple[str, ...]) -> pd.DataFram
     return result
 
 
-@st.cache_resource
 def get_connection():
     url = os.environ.get("READ_ONLY_DATABASE_URL")
     try:
@@ -31,12 +30,12 @@ def get_connection():
         pass
     if not url:
         raise RuntimeError("Set READ_ONLY_DATABASE_URL in the environment or Streamlit Secrets")
-    return psycopg.connect(url)
+    return psycopg.connect(url, connect_timeout=20, autocommit=True)
 
 
 @st.cache_data(ttl=900)
 def query(sql: str, params: tuple = ()) -> pd.DataFrame:
-    with get_connection().cursor() as cur:
+    with get_connection() as conn, conn.cursor() as cur:
         cur.execute(sql, params)
         columns = [column.name for column in cur.description]
         return pd.DataFrame(cur.fetchall(), columns=columns)
@@ -48,8 +47,8 @@ try:
     campaign = query("SELECT * FROM mart.daily_campaign_kpi ORDER BY report_date")
     vintage = query("SELECT * FROM mart.vintage_kpi ORDER BY report_date")
     dq = query("SELECT * FROM mart.dq_summary ORDER BY report_date DESC, check_name")
-except Exception as exc:
-    st.error(f"Dashboard data is unavailable: {exc}")
+except Exception:
+    st.error("Dashboard data is temporarily unavailable. Please retry shortly.")
     st.info("Configure READ_ONLY_DATABASE_URL and run the pipeline once.")
     st.stop()
 
@@ -93,10 +92,8 @@ if page == "Overview":
         trend = credit.groupby("report_date", as_index=False).agg(
             applications=("applications", "sum"), funded_amount=("funded_amount", "sum")
         )
-        st.plotly_chart(
-            px.line(trend, x="report_date", y=["applications", "funded_amount"], title="Daily acquisition and funding"),
-            use_container_width=True,
-        )
+        for metric, label in [("applications", "Daily applications (count)"), ("funded_amount", "Daily funding (HKD)")]:
+            st.plotly_chart(px.line(trend, x="report_date", y=metric, title=label), use_container_width=True)
     if not portfolio.empty:
         risk = portfolio[portfolio.report_date == latest_date]
         st.plotly_chart(
@@ -138,7 +135,10 @@ elif page == "Portfolio risk":
             use_container_width=True,
         )
         if not vintage.empty:
-            latest_vintage = vintage[vintage.report_date == latest_date]
+            latest_vintage = vintage.sort_values("report_date").drop_duplicates(
+                ["origination_month", "months_on_book"], keep="last"
+            )
+            st.caption("Each cell uses the latest available observation for its origination month and completed-month age bucket. Cells can have different observation dates and loan composition; this is not a fixed-cohort default-rate estimate.")
             heat = latest_vintage.pivot_table(index="origination_month", columns="months_on_book", values="dpd_30_rate")
             st.plotly_chart(
                 px.imshow(heat, aspect="auto", color_continuous_scale="Reds", title="DPD 30+ vintage heatmap"),

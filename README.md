@@ -1,12 +1,18 @@
 # Automated FinTech KPI Reporting Pipeline
 
+[![CI](https://github.com/BestYlay/automated-fintech-kpi-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/BestYlay/automated-fintech-kpi-pipeline/actions/workflows/ci.yml)
+
+[Dashboard](https://automated-fintech-kpi-pipeline-b7m5mnizetmsfkudvcfb8q.streamlit.app/) ·
+[Measured verification and metric limitations](docs/release-verification.md)
+
 Reproducible, synthetic Hong Kong unsecured-loan data pipeline for portfolio,
 credit-funnel, collections, campaign and vintage reporting.
 
 The project is intentionally small enough to explain in an interview, but it
 contains the pieces that make a daily batch realistic: append-only events,
 versioned corrections, late-arriving payments, idempotent loads, PostgreSQL
-marts, data-quality gates, a live Streamlit dashboard and a Power BI model.
+marts, data-quality gates and a Streamlit dashboard. Power BI authoring is paused;
+no completed PBIX is included in this release.
 
 ## What is simulated
 
@@ -29,8 +35,8 @@ flowchart LR
     B --> C[staging latest-version views]
     C --> D[Data-quality gate]
     D --> E[PostgreSQL mart tables]
-    E --> F[Streamlit dashboard]
-    E --> G[Power BI import model]
+    I --> F[Streamlit dashboard]
+    E -. planned .-> G[Power BI deferred]
     H[Windows Task Scheduler] --> A
     E -. aggregate mart sync .-> I[Neon read-only dashboard store]
     H --> E
@@ -114,7 +120,7 @@ with:
 
 ## Reporting views
 
-The Streamlit app and Power BI model use the same marts:
+The Streamlit app uses these reporting marts (Power BI is deferred):
 
 1. Executive KPI overview and data freshness.
 2. Application → approval → acceptance → disbursement funnel.
