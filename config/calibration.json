@@ -15,6 +15,8 @@
     "term_months": [6, 12, 24, 36],
     "annual_rate": [0.06, 0.30],
     "late_payment_max_delay_days": 30,
+    "partial_payment_cure_selection_probability": 0.70,
+    "partial_payment_cure_delay_days": [15, 60],
     "correction_probability": 0.005,
     "invalid_input_probability": 0.001,
     "duplicate_input_probability": 0.002

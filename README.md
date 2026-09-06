@@ -123,7 +123,7 @@ with:
 The Streamlit app uses these reporting marts (Power BI is deferred):
 
 1. Executive KPI overview and data freshness.
-2. Application → approval → acceptance → disbursement funnel.
+2. Application → approval → acceptance funnel, plus separate daily disbursement flows.
 3. Portfolio balance, collections and DPD trends.
 4. Origination vintage × months-on-book.
 5. Channel/campaign performance and pipeline quality.
@@ -134,6 +134,9 @@ are entered locally and are never committed.
 ## Reproducibility and limitations
 
 - Synthetic values are realistic-shaped, not population estimates.
+- [Metric definitions](docs/metric_dictionary.md) distinguish daily flows, snapshots,
+  loan-level delinquency and calendar-month vintage cohorts. The September 2026
+  business correction is documented in [release verification](docs/release-verification.md).
 - The project does not make lending, credit-policy or regulatory claims.
 - Full generated raw data is not committed; the generator and small samples are.
 - The live Streamlit page contains aggregate synthetic data only.

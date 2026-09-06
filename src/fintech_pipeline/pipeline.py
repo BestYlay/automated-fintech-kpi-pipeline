@@ -75,11 +75,14 @@ def _state(conn: psycopg.Connection, report_date: date) -> dict[str, Any]:
         SELECT i.installment_id, i.loan_id, i.installment_no, i.due_date,
                i.scheduled_principal::float8 AS scheduled_principal,
                i.scheduled_interest::float8 AS scheduled_interest,
-               i.amount_due::float8 AS amount_due, l.risk_grade
+               i.amount_due::float8 AS amount_due, l.risk_grade,
+               COALESCE(p.amount_paid,0) AS amount_paid,COALESCE(p.principal_paid,0) AS principal_paid,
+               p.first_payment_date
         FROM staging.installment_latest i
         JOIN staging.loan_latest l ON l.loan_id = i.loan_id
         LEFT JOIN (
-            SELECT installment_id, SUM(amount)::float8 AS amount_paid
+            SELECT installment_id, SUM(amount)::float8 AS amount_paid,
+                   SUM(principal_paid)::float8 AS principal_paid,MIN(payment_date) AS first_payment_date
             FROM staging.payment_latest
             GROUP BY installment_id
         ) p ON p.installment_id = i.installment_id
@@ -218,6 +221,17 @@ def _quality_checks(conn: psycopg.Connection, report_date: date) -> list[dict]:
         {"report_date": report_date},
         details="A large volume spike is recorded as a warning, not a hard failure.",
     )
+    check("principal_bounds", "hard",
+          "SELECT count(*)::numeric value FROM staging.loan_latest WHERE principal<5000 OR principal>150000")
+    check("payment_allocation", "hard", """
+        SELECT count(*)::numeric value FROM (
+          SELECT i.installment_id FROM staging.installment_latest i
+          JOIN staging.payment_latest p USING(installment_id)
+          GROUP BY i.installment_id,i.amount_due,i.scheduled_principal,i.scheduled_interest
+          HAVING sum(p.amount)>i.amount_due+0.02 OR sum(p.principal_paid)>i.scheduled_principal+0.02
+            OR sum(p.interest_paid)>i.scheduled_interest+0.02
+            OR abs(sum(p.amount)-sum(p.principal_paid)-sum(p.interest_paid))>0.02
+        ) q""")
     return checks
 
 
@@ -272,6 +286,20 @@ def _refresh_marts(conn: psycopg.Connection, report_date: date, lookback_days: i
         for name in ("daily_credit_kpi", "daily_portfolio_kpi", "daily_campaign_kpi", "vintage_kpi"):
             query = (MART_SQL / f"{name}.sql").read_text(encoding="utf-8")
             conn.execute(query, {"report_date": affected_date})
+        verify_funding(conn, affected_date)
+
+
+def verify_funding(conn: psycopg.Connection, report_date: date) -> None:
+    values = conn.execute("""
+      SELECT (SELECT count(*) FROM staging.loan_latest WHERE disbursement_date=%s),
+        (SELECT coalesce(sum(principal),0) FROM staging.loan_latest WHERE disbursement_date=%s),
+        (SELECT coalesce(sum(funded_count),0) FROM mart.daily_credit_kpi WHERE report_date=%s),
+        (SELECT coalesce(sum(funded_amount),0) FROM mart.daily_credit_kpi WHERE report_date=%s)
+    """, (report_date,)*4).fetchone()
+    if values[0] != values[2] or values[1] != values[3]:
+        raise PipelineFailure(f"funding reconciliation failed on {report_date}")
+    _record_quality(conn, report_date, [dict(check_name="funding_reconciliation",severity="hard",
+        status="passed",observed_value=0,details="Daily funded count and principal reconcile to disbursement-date loans.")])
 
 
 def _delete_mart_dates(conn: psycopg.Connection, report_dates: list[date]) -> None:

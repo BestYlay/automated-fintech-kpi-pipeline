@@ -102,6 +102,7 @@ if page == "Overview":
         )
 
 elif page == "Credit funnel":
+    st.caption("Applications, approvals and acceptances are grouped by application date. Funding is a separate disbursement-date flow; it can exceed today's acceptances and is not a same-cohort conversion rate.")
     if credit.empty:
         st.info("No credit data")
     else:
@@ -117,11 +118,12 @@ elif page == "Credit funnel":
             )
             st.dataframe(funnel, use_container_width=True, hide_index=True)
             st.plotly_chart(
-                px.bar(funnel, x="channel", y=["applications", "approvals", "accepted", "funded_count"], barmode="group"),
+                px.bar(funnel, x="channel", y=["applications", "approvals", "accepted"], barmode="group"),
                 use_container_width=True,
             )
 
 elif page == "Portfolio risk":
+    st.caption("Loan-level DPD balances include each delinquent loan's full outstanding principal. Synthetic risk assumptions are not calibrated to Hong Kong market delinquency; no write-offs or restructurings are modeled.")
     if portfolio.empty:
         st.info("No portfolio data")
     else:
@@ -138,7 +140,7 @@ elif page == "Portfolio risk":
             latest_vintage = vintage.sort_values("report_date").drop_duplicates(
                 ["origination_month", "months_on_book"], keep="last"
             )
-            st.caption("Each cell uses the latest available observation for its origination month and completed-month age bucket. Cells can have different observation dates and loan composition; this is not a fixed-cohort default-rate estimate.")
+            st.caption("Calendar-month vintage: completed cells use month-end snapshots; the latest month is provisional. DPD30 is the full outstanding balance of loans whose oldest unpaid installment is at least 30 days overdue, divided by cohort outstanding balance.")
             heat = latest_vintage.pivot_table(index="origination_month", columns="months_on_book", values="dpd_30_rate")
             st.plotly_chart(
                 px.imshow(heat, aspect="auto", color_continuous_scale="Reds", title="DPD 30+ vintage heatmap"),
@@ -146,6 +148,7 @@ elif page == "Portfolio risk":
             )
 
 elif page == "Campaigns":
+    st.caption("31-day touch window, inclusive of today. Each application is attributed to its last touch within the preceding 7 days (inclusive). Recent touches have incomplete follow-up. Rates describe attribution, not causal marketing uplift. Open/click fields are generic synthetic engagement signals.")
     if campaign.empty:
         st.info("No campaign data")
     else:

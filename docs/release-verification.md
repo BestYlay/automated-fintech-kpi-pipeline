@@ -17,16 +17,41 @@ Power BI remains deferred. Synthetic data only.
 - Streamlit AppTest executed all five pages using the real Neon reader. Every page
   had no exception/error and displayed 2026-09-05. This is application execution
   testing, not visual inspection of the deployed Cloud instance.
-- Verification script completed in 43.36 seconds (network/runtime dependent).
+- Post-correction verification script completed in 32.83 seconds (network/runtime dependent).
+- All 19 tests passed, including PostgreSQL fixtures for delayed funding,
+  last-touch attribution, whole-loan DPD and calendar-month vintage.
 - Existing scheduler: StartWhenAvailable, IgnoreNew, three retries at 30 minutes.
 
 | Mart | Rows | SHA-256 |
 | --- | ---: | --- |
-| daily_credit_kpi | 5374 | eb6ca46835ec5da1118a361345e1818725253227921428b3dad0d6b3d9b8643d |
-| daily_portfolio_kpi | 1239 | d2aee5c641b25afe5bfca3ed326cd22896f836a45efe4e99d79e39bbd4f24b33 |
-| daily_campaign_kpi | 36084 | 07d23f0f3eda10a83d976da64e386a6470cf505c2b56b3e1e59836e6923bd8f7 |
-| vintage_kpi | 1999 | 0fba37a3f0cb41fc8e322d8fc6c08af6ac2dca57205e597ed7903bea6b1152fb |
-| dq_summary | 1488 | d9882a9e218aea5dd1be7f7ee2903b72153b15f5e7e83ce9b1364f6193ba3bfb |
+| daily_credit_kpi | 5584 | 3149b7d2915e16207dcc9e323a64e104619a566d95ab808488b7d5ff57b0da48 |
+| daily_portfolio_kpi | 1239 | 098a5702eb742e7c7896ef35450bfa295dbb4bcfb91c9e605ee615bee70b53c1 |
+| daily_campaign_kpi | 36084 | f4b58d6549ee304942797157dba1a16210138a8e26bc2e506412c67f32951bf7 |
+| vintage_kpi | 1145 | b9bd47afa8f6c791472b538efdbb989cee33a0bc783587776c33932d62486189 |
+| dq_summary | 2232 | 18bfd31e8d38e8eccc96b86be460f6966ad133f48903020e18613b099fabd12a |
+
+## Business correction applied September 6
+
+`scripts/repair_business_metrics.py --publish` backed up six raw tables, five marts
+and run/quality audit tables in local schema `business_fix_20260906` before any
+correction. It appended source versions for loans below HK$5,000 and their
+dependent schedules/payments, added 804 deterministic residual cure payments
+(HK$465,435.07), rebuilt 248 dates in two workers into shadow tables, and replaced
+the local marts transactionally before publishing to Neon. Backups remain local;
+restoration must be coordinated with any later daily runs, not blindly replayed.
+Progress is retained in `logs/business_repair_progress.txt`.
+
+Measured repair duration: 42.1 seconds including publication; mart phase 20.2
+seconds. Workers used indexed temporary canonical snapshots to avoid repeatedly
+evaluating raw-event window views. This is not a benchmark of the regular daily job.
+
+- Cumulative disbursed loans: 4,665; principal HK$94,706,950.43, reconciled to staging.
+- September 5: 44 applications, 18 approvals, 16 acceptances; 20 disbursements,
+  HK$377,772.52. These are different daily flows, not a four-step single cohort.
+- Canonical loan principal bounds: HK$5,000.00–144,393.35.
+- Latest outstanding principal: HK$67,088,863.73; loan-level DPD30 balance:
+  HK$8,190,389.38 (12.21%). This is a synthetic scenario, not a validated market rate.
+- Original report snapshots and their old installment-level DPD ratios are superseded.
 
 ## Reproduction and incident recovery
 
@@ -52,13 +77,15 @@ the outage without regenerating raw data.
 - Portfolio balances and campaign attribution tables are date snapshots. Do not
   sum snapshots across reporting dates. Amount due/paid in the portfolio table are
   cumulative through the reporting date, not daily collections flows.
-- DPD balances represent unpaid principal of overdue installments, not the full
-  outstanding balance of all loans with any delinquent installment. They must not
-  be advertised as a regulatory loan-level portfolio delinquency ratio.
-- Vintage age uses completed months since individual loan disbursement. The heatmap
-  selects the latest available observation per origination-month/age cell. Cells
-  may contain different loans and dates; it is an exploratory age-bucket view,
-  not a fixed-cohort month-end vintage or default probability estimate.
+- DPD balances now represent full outstanding principal of delinquent loans.
+  These are internal synthetic definitions, not regulatory reporting certification.
+- Vintage uses calendar-month MOB and fixed origination cohorts; completed cells
+  use month-end observations, while the current month remains provisional.
+- Campaigns use canonical seven-day last-touch attribution, not the legacy source
+  campaign_id. Recent touches have incomplete follow-up; attribution is not uplift.
+- Partial-payment cure selection (70%, 15–60 days) is a synthetic assumption.
+  Uncured/missed installments have no later recovery, and write-offs, restructuring
+  and prepayments remain unmodeled. No claim of realistic portfolio calibration.
 - Income configuration records a reference median and synthetic assumptions; this
   release does not claim a statistically validated fit to the full HK population.
 - Forced worker failure, every correction/late-event edge case, physical network

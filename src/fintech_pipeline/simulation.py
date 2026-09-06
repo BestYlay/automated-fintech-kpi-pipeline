@@ -202,7 +202,7 @@ def simulate_day(report_date: date, state: dict[str, Any]) -> Batch:
         if rng.random() >= 0.90:
             continue
         loan_id = application_id * 10 + 1
-        principal = round(requested * rng.uniform(0.85, 1.0), 2)
+        principal = round(max(5000.0, requested * rng.uniform(0.85, 1.0)), 2)
         term = int(rng.choice([6, 12, 24, 36], p=[0.28, 0.42, 0.24, 0.06]))
         annual_rate = round(float(np.clip(0.08 + (850 - score) / 3000 + rng.normal(0, 0.01), 0.06, 0.30)), 4)
         disbursement = report_date + timedelta(days=int(rng.integers(0, 3)))
@@ -234,9 +234,13 @@ def simulate_day(report_date: date, state: dict[str, Any]) -> Batch:
         for loan in loan_rows
         if row["loan_id"] == loan["loan_id"]
     ]
-    existing_payment_installments = set(state.get("paid_installment_ids", []))
     for installment in open_installments:
-        if installment["due_date"] > report_date or installment["installment_id"] in existing_payment_installments:
+        if installment["due_date"] > report_date:
+            continue
+        if float(installment.get("amount_paid", 0)) > 0:
+            cure = cure_payment(installment, report_date)
+            if cure:
+                batch.payments.append(cure)
             continue
         payment_date, fraction = _payment_plan(installment)
         if payment_date != report_date:
@@ -275,3 +279,24 @@ def simulate_day(report_date: date, state: dict[str, Any]) -> Batch:
         # deliberate bad record is injected; popping a valid application here
         # can therefore leave an otherwise valid loan orphaned.
     return batch
+
+
+def cure_payment(installment: dict, report_date: date) -> dict | None:
+    """A synthetic 70% of partial payers cure within a further 15-60 days."""
+    first_date = installment.get("first_payment_date")
+    if first_date is None or float(installment.get("amount_paid", 0)) <= 0:
+        return None
+    iid = installment["installment_id"]
+    if _stable_int(iid, "cure") % 100 >= 70:
+        return None
+    cure_date = first_date + timedelta(days=15 + _stable_int(iid, "cure_delay") % 46)
+    if report_date != cure_date:
+        return None
+    amount = round(float(installment["amount_due"]) - float(installment["amount_paid"]), 2)
+    principal = round(float(installment["scheduled_principal"]) - float(installment["principal_paid"]), 2)
+    if amount <= 0:
+        return None
+    pid = iid * 10 + 2
+    return _event("payment", pid, report_date, dict(payment_id=pid, loan_id=installment["loan_id"],
+        installment_id=iid,payment_date=report_date,amount=amount,principal_paid=principal,
+        interest_paid=round(amount-principal,2),payment_status="cured"))
